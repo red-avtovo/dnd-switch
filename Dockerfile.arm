@@ -1,0 +1,13 @@
+FROM nginx
+ARG STATIC_PATH
+ARG TARGET=.
+ARG BINARY_NAME
+
+LABEL authors="red.avtovo@gmail.com"
+
+COPY $STATIC_PATH /usr/share/nginx/html
+ENV RUST_LOG="info"
+ENV BINARY_NAME=${BINARY_NAME}
+
+COPY ./target/$TARGET/release/$BINARY_NAME /opt/
+CMD nginx ; /opt/$BINARY_NAME

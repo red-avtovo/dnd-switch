@@ -9,11 +9,11 @@ mod u_client;
 
 use crate::models::AppState;
 use crate::u_client::UnifiClient;
+use actix_cors::Cors;
 use actix_web::*;
 use models::{Bandwidth, DndState};
 use std::env;
 use std::sync::Arc;
-use actix_cors::Cors;
 
 #[get("/state")]
 async fn get_state(state: web::Data<AppState>) -> HttpResponse {
@@ -89,6 +89,7 @@ async fn main() -> std::io::Result<()> {
             .unwrap(),
     });
 
+    let listen_addr = env::var("LISTEN_ADDR").unwrap_or("0.0.0.0".to_string());
     let port = env::var("PORT").unwrap_or("8080".to_string());
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -107,7 +108,7 @@ async fn main() -> std::io::Result<()> {
             .service(get_state)
             .service(set_state)
     })
-    .bind(format!("127.0.0.1:{}", port))?
+    .bind(format!("{}:{}", listen_addr, port))?
     .run()
     .await
 }

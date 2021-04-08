@@ -1,21 +1,17 @@
 mod models;
 
+use crate::models::DndState;
+use log::{debug, info};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
-use yewprint::{
-    Switch,
-    Spinner,
-};
-use crate::models::DndState;
-use log::{
-    info,
-    debug
-};
+use yewprint::{Spinner, Switch};
 
 #[macro_use]
 extern crate stdweb;
 use crate::stdweb::unstable::TryInto;
+
+static BE_PORT: i32 = 8001;
 
 struct Model {
     be_url: String,
@@ -43,7 +39,8 @@ async fn wrap<F: std::future::Future>(f: F, done_cb: yew::Callback<F::Output>) {
 }
 
 async fn turn_on(url: String) -> Result<(), String> {
-    reqwest::Client::new().post(format!("{}/state", url))
+    reqwest::Client::new()
+        .post(format!("{}/state", url))
         .json(&DndState { state: true })
         .send()
         .and_then(|_| async move { Ok(()) })
@@ -52,7 +49,8 @@ async fn turn_on(url: String) -> Result<(), String> {
 }
 
 async fn turn_off(url: String) -> Result<(), String> {
-    reqwest::Client::new().post(format!("{}/state", url))
+    reqwest::Client::new()
+        .post(format!("{}/state", url))
         .json(&DndState { state: false })
         .send()
         .and_then(|_| async move { Ok(()) })
@@ -61,7 +59,8 @@ async fn turn_off(url: String) -> Result<(), String> {
 }
 
 async fn load_state(url: String) -> Result<bool, String> {
-    let res: Result<bool, String> = reqwest::Client::new().get(format!("{}/state", url))
+    let res: Result<bool, String> = reqwest::Client::new()
+        .get(format!("{}/state", url))
         .send()
         .and_then(|res| async move { res.json::<DndState>().await })
         .and_then(|dnd: DndState| async move { Ok(dnd.state) })
@@ -74,8 +73,10 @@ async fn load_state(url: String) -> Result<bool, String> {
 fn get_be_url() -> String {
     let hostname: String = (js! {
         return window.location.hostname
-    }).try_into().unwrap();
-    format!("http://{}:8080", hostname)
+    })
+    .try_into()
+    .unwrap();
+    format!("http://{}:{}", hostname, BE_PORT)
 }
 
 impl Component for Model {
@@ -96,29 +97,29 @@ impl Component for Model {
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            Msg::Toggle => {
-                match self.active {
-                    true => self.link.send_message(Msg::Off),
-                    false => self.link.send_message(Msg::On)
-                }
-            }
+            Msg::Toggle => match self.active {
+                true => self.link.send_message(Msg::Off),
+                false => self.link.send_message(Msg::On),
+            },
             Msg::On => {
                 self.loading = true;
-                spawn_local(
-                    wrap(turn_on(self.be_url.clone()),
-                         self.link.callback(|res| match res {
-                             Ok(_) => Msg::TogglePerform,
-                             Err(_) => Msg::Done
-                         })))
+                spawn_local(wrap(
+                    turn_on(self.be_url.clone()),
+                    self.link.callback(|res| match res {
+                        Ok(_) => Msg::TogglePerform,
+                        Err(_) => Msg::Done,
+                    }),
+                ))
             }
             Msg::Off => {
                 self.loading = true;
-                spawn_local(
-                    wrap(turn_off(self.be_url.clone()),
-                         self.link.callback(|res| match res {
-                             Ok(_) => Msg::TogglePerform,
-                             Err(_) => Msg::Done
-                         })))
+                spawn_local(wrap(
+                    turn_off(self.be_url.clone()),
+                    self.link.callback(|res| match res {
+                        Ok(_) => Msg::TogglePerform,
+                        Err(_) => Msg::Done,
+                    }),
+                ))
             }
             Msg::TogglePerform => {
                 self.active = !self.active;
@@ -127,12 +128,13 @@ impl Component for Model {
             Msg::Done => self.loading = false,
             Msg::Load => {
                 self.loading = true;
-                spawn_local(
-                    wrap(load_state(self.be_url.clone()),
-                         self.link.callback(|res| match res {
-                             Ok(s) => Msg::LoadPerform(s),
-                             Err(_) => Msg::Broken
-                         })))
+                spawn_local(wrap(
+                    load_state(self.be_url.clone()),
+                    self.link.callback(|res| match res {
+                        Ok(s) => Msg::LoadPerform(s),
+                        Err(_) => Msg::Broken,
+                    }),
+                ))
             }
             Msg::LoadPerform(s) => {
                 self.active = s;
@@ -156,9 +158,10 @@ impl Component for Model {
 
     fn view(&self) -> Html {
         let spinner_class = match self.loading {
-            false => { "hidden" }
-            true => { "" }
-        }.to_string();
+            false => "hidden",
+            true => "",
+        }
+        .to_string();
 
         return html! {
             <div class={"wrapper"}>

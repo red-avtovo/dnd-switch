@@ -4,14 +4,14 @@ ARG BINARY_NAME
 # as binary name but - -> _
 ARG DEP_NAME
 
-COPY ../Cargo.toml Cargo.toml
+COPY ./be/Cargo.toml Cargo.toml
 
 RUN mkdir src/ && \
     echo "fn main() {println!(\"if you see this, the build broke\")}" > src/main.rs && \
     cargo build --release --target=x86_64-unknown-linux-musl
 RUN rm -f target/x86_64-unknown-linux-musl/release/deps/${DEP_NAME}*
 
-COPY .. .
+COPY ./be .
 RUN cargo build --release --target=x86_64-unknown-linux-musl
 
 
@@ -26,7 +26,7 @@ COPY --from=cargo-build /home/rust/src/target/x86_64-unknown-linux-musl/release/
 
 ENV RUST_LOG="info"
 ENV BINARY_NAME=$BINARY_NAME
-RUN apk add --no-cache ca-certificates && update-ca-certificates
+RUN apt install ca-certificates -y && update-ca-certificates
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 ENV SSL_CERT_DIR=/etc/ssl/certs
 

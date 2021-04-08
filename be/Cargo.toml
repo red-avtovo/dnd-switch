@@ -19,3 +19,6 @@ env_logger = "0.8.2"
 
 [dev-dependencies]
 actix-rt = "2.1.0"
+
+[target.armv7-linux-androideabi.dependencies]
+openssl = { version = "*", features = ["vendored"] }
