@@ -1,0 +1,21 @@
+[package]
+name = "client-group-switcher"
+version = "0.1.0"
+authors = ["Aleksandr Bochev <red.avtovo@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-web= { version = "4.0.0-beta.5", features = ["rustls"]}
+actix-cors = "0.6.0-beta.1"
+
+serde = { version = "1.0.125", features = ["derive"] }
+reqwest = { version = "0.11.2", features = ["json", "cookies"]}
+futures = "0.3.13"
+
+log = "0.4.8"
+env_logger = "0.8.2"
+
+[dev-dependencies]
+actix-rt = "2.1.0"

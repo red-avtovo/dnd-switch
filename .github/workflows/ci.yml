@@ -1,0 +1,179 @@
+name: CI
+
+on: [push]
+
+env:
+  DOCKER_IMAGE: docker.io/redavtovo/dnd-switch
+  BINARY_NAME: client-group-switcher
+  STATIC_PATH: fe/static
+
+jobs:
+  build_x86_64:
+    name: Build X86_64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+
+      #       Solves env substitution in args
+      - name: Set Vars
+        id: vars
+        run: |
+          echo ::set-output name=sha_short::$(git rev-parse --short=6 ${{ github.sha }})
+          echo ::set-output name=DEP_NAME::$(echo "$BINARY_NAME" | tr - _)
+
+      - name: Install Packer
+        uses: actions-rs/cargo@v1
+        env:
+          CC: arm-linux-gnueabihf-gcc
+        with:
+          command: install
+          args: wasm-pack
+
+      - name: Pack
+        if: github.ref == 'refs/heads/main'
+        run: |
+          wasm-pack build --release --no-typescript --target web --out-name wasm --out-dir static fe
+
+      - name: Docker build
+        run: |
+          docker build \
+          --build-arg BINARY_NAME=${BINARY_NAME} \
+          --build-arg STATIC_PATH=${STATIC_PATH} \
+          --build-arg DEP_NAME=${{ steps.vars.outputs.DEP_NAME }} \
+          -t ${DOCKER_IMAGE}:${{ steps.vars.outputs.sha_short }} .
+
+      - name: Docker login
+        if: github.ref == 'refs/heads/main'
+        uses: azure/docker-login@v1
+        with:
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Push image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag ${DOCKER_IMAGE}:${{ steps.vars.outputs.sha_short }} ${DOCKER_IMAGE}:amd64_latest
+          docker push ${DOCKER_IMAGE}:${{ steps.vars.outputs.sha_short }}
+          docker push ${DOCKER_IMAGE}:amd64_latest
+
+  build_arm_v7:
+    name: Build ARM
+    runs-on: ubuntu-latest
+    env:
+      RUST_TARGET: armv7-unknown-linux-gnueabihf
+      DOCKER_TARGET_PLATFORM: linux/arm/v7
+      DOCKER_FILE: Dockerfile.arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install Dependencies
+        run: |
+          sudo apt install gcc-arm-linux-gnueabihf -y
+          rustup target add ${RUST_TARGET}
+      #       Solves env substitution in args
+      - name: Set Vars
+        id: vars
+        run: |
+          echo ::set-output name=sha_short::$(git rev-parse --short=6 ${{ github.sha }})
+          echo ::set-output name=RUST_TARGET::${RUST_TARGET}
+      - name: Install Packer
+        uses: actions-rs/cargo@v1
+        env:
+          CC: arm-linux-gnueabihf-gcc
+        with:
+          command: install
+          args: wasm-pack
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        env:
+          CC: arm-linux-gnueabihf-gcc
+        with:
+          command: build
+          args: --release --all-features --target=${{ steps.vars.outputs.RUST_TARGET }}
+
+      - name: Pack
+        if: github.ref == 'refs/heads/main'
+        run: |
+          wasm-pack build --release --no-typescript --target web --out-name wasm --out-dir static fe
+
+      - name: Docker login
+        if: github.ref == 'refs/heads/main'
+        uses: azure/docker-login@v1
+        with:
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: crazy-max/ghaction-docker-buildx@v1
+        with:
+          version: latest
+
+      - name: Docker buildx build
+        if: github.ref != 'refs/heads/main'
+        run: |
+          docker buildx build \
+          --platform ${DOCKER_TARGET_PLATFORM} \
+          --tag ${DOCKER_IMAGE}:${{ steps.vars.outputs.sha_short }} \
+          --build-arg TARGET=${RUST_TARGET} \
+          --file ./${DOCKER_FILE} \
+          --load .
+      - name: Docker buildx build and push
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker buildx build \
+          --platform ${DOCKER_TARGET_PLATFORM} \
+          --tag ${DOCKER_IMAGE}:${{ steps.vars.outputs.sha_short }} \
+          --tag ${DOCKER_IMAGE}:arm_latest \
+          --build-arg TARGET=${RUST_TARGET} \
+          --file ./${DOCKER_FILE} \
+          --push .
+
+# JOIN BUILDS INTO LATEST
+
+  publish_latest:
+    name: Publish latest
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    env:
+      DOCKER_FILE: Dockerfile.latest
+      DOCKER_TARGET_PLATFORM: linux/amd64,linux/arm/v7
+    needs:
+      - build_x86_64
+      - build_arm_v7
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+
+      - name: Docker login
+        uses: azure/docker-login@v1
+        with:
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: crazy-max/ghaction-docker-buildx@v1
+        with:
+          version: latest
+
+      - name: Docker buildx build and push
+        run: |
+          docker buildx build \
+          --platform ${DOCKER_TARGET_PLATFORM} \
+          --build-arg IMAGE=${DOCKER_IMAGE} \
+          --tag ${DOCKER_IMAGE}:latest \
+          --file ./${DOCKER_FILE} \
+          --push .

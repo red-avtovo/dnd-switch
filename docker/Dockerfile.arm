@@ -1,0 +1,8 @@
+FROM nginx
+ARG STATIC_PATH
+COPY $STATIC_PATH /usr/share/nginx/html
+LABEL authors="red.avtovo@gmail.com"
+ARG TARGET=.
+ARG BINARY_NAME
+COPY ./target/$TARGET/release/$BINARY_NAME /opt/
+CMD /opt/$BINARY_NAME
