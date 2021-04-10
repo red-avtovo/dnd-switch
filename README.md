@@ -34,3 +34,6 @@ Instead of making a toaster out of Unifi USG by enabling QoS it is possible to l
         -e UNIFI_GROUP=De-prio 
         -p 8000:80 -p 8001:8080 \
         redavtovo/dnd-switch:arm_latest
+
+### References
+https://realfavicongenerator.net/
